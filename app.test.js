@@ -38,7 +38,7 @@ describe("Test Image API - Story 1", () => {
   test("It should response 200 and a json response of the image url", async () => {
     const response = await request(app)
       .post("/api/image")
-      .attach('file', 'test/file/image.png');
+      .attach('file', 'test/file/image.webp');
 
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.text)).toHaveProperty('image');
@@ -46,12 +46,12 @@ describe("Test Image API - Story 1", () => {
 });
 
 describe("Fail Image API - Story 1", () => {
-  test("It should response 403 and a json response error", async () => {
+  test("It should response 500 and a json response error", async () => {
     const response = await request(app)
       .post("/api/image")
       .attach('file', 'test/file/file.zip');
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.text)).toHaveProperty('err');
   });
 });
@@ -71,7 +71,7 @@ describe("Fail Zip API - Story 2", () => {
   test("It should response 403 and a json response error", async () => {
     const response = await request(app)
       .post("/api/zip")
-      .attach('file', 'test/file/image.png');
+      .attach('file', 'test/file/image.webp');
 
     expect(response.statusCode).toBe(403);
     expect(JSON.parse(response.text)).toHaveProperty('err');
@@ -82,7 +82,7 @@ describe("Test Resize API - Story 2.2", () => {
   test("Big image test should response 200 and return json object with 3 images", async () => {
     const response = await request(app)
       .post("/api/resize")
-      .attach('file', 'test/file/big.png');
+      .attach('file', 'test/file/big.jpeg');
 
     const results = JSON.parse(response.text);
     expect(response.statusCode).toBe(200);
@@ -93,7 +93,7 @@ describe("Test Resize API - Story 2.2", () => {
   test("small image test should response 200 and return json object with 1 image", async () => {
     const response = await request(app)
       .post("/api/resize")
-      .attach('file', 'test/file/small.png');
+      .attach('file', 'test/file/small.jpeg');
 
     const results = JSON.parse(response.text);
     expect(response.statusCode).toBe(200);
@@ -104,12 +104,12 @@ describe("Test Resize API - Story 2.2", () => {
 });
 
 describe("Fail Resize API - Story 2.2", () => {
-  test("It should response 403 and a json response error", async () => {
+  test("It should response 500 and a json response error", async () => {
     const response = await request(app)
       .post("/api/resize")
       .attach('file', 'test/file/file.zip');
 
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.text)).toHaveProperty('err');
   });
 });

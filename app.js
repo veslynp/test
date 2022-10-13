@@ -9,6 +9,7 @@ const fs = require('fs');
 const multer = require("multer");
 const glob = require("glob");
 const AdmZip = require("adm-zip");
+const gm = require("gm");
 
 
 
@@ -25,7 +26,7 @@ app.iniDirectories = async function() {
 }
 app.iniDirectories();
 
-handleError = (err, res, fn) => {
+const handleError = (err, res, fn) => {
   console.log('handle error', err);
   if(fn) {
     fn();
@@ -42,34 +43,44 @@ const upload = multer({
   dest: "public/upload/"
 });
 
+const uploadImage = (req, res) => {
+  const tempPath = req.file.path;
+  const curFileExt = path.extname(req.file.originalname).toLowerCase();
+  const newFileName = uuidv4() + curFileExt;
+  const targetPath = path.join(__dirname, 'public','images', newFileName);
+  const newUrl = hostname + 'images/' + newFileName;
+
+  if ( /\.(jpe?g|png|gif|bmp|webp)$/i.test(curFileExt) ) {
+    try {
+      fs.promises.rename(tempPath, targetPath);
+    } catch (err) {
+      return {err: err}
+    }
+    return { image: newUrl, path: targetPath };
+  } else {
+    try {
+      fs.promises.unlink(tempPath);
+    } catch (err) {
+      return {err: err}
+    }
+    return {err: 'File isn\' an image'}
+  }
+
+}
+
 app.post(
   "/api/image",
   upload.single("file"),
   (req, res) => {
-    const tempPath = req.file.path;
-    const curFileExt = path.extname(req.file.originalname).toLowerCase();
-    const newFileName = uuidv4() + curFileExt;
-    const targetPath = path.join(__dirname, 'public','images', newFileName);
-    const newUrl = hostname + 'images/' + newFileName;
+    const result = uploadImage(req, res);
+    if(result.image) {
+      res
+        .status(200)
+        .contentType('application/json')
+        .end(JSON.stringify({ image: result.image }));
 
-    if ( /\.(jpe?g|png|gif|bmp)$/i.test(curFileExt) ) {
-      fs.rename(tempPath, targetPath, err => {
-        if (err) return handleError(err.toString(), res);
-
-        res
-          .status(200)
-          .contentType('application/json')
-          .end(JSON.stringify({ image: newUrl }));
-      });
     } else {
-      fs.unlink(tempPath, err => {
-        if (err) return handleError(err.toString(), res);
-
-        res
-          .status(403)
-          .contentType('application/json')
-          .end(JSON.stringify({ err: 'File isn\' an image' }));
-      });
+      handleError(result.err, res);
     }
   }
 );
@@ -89,15 +100,11 @@ app.post(
       fs.readdirSync(uploadFolder).forEach(f => fs.rmSync(`${uploadFolder}/${f}`));
     }
 
-
     if ( /\.(zip)$/i.test(curFileExt) ) {
       try {
         app.mkdir(tmpPath);
-
         var zip = new AdmZip(tempPath);
-
         zip.extractAllTo(tmpPath, true);
-
         try {
           const getDirectories = function (src, callback) {
             glob(src + '/**/*', callback);
@@ -111,7 +118,7 @@ app.post(
                 const newFileName = uuidv4() + curImageExt;
                 const targetPath = path.join(__dirname, 'public','images', newFileName);
                 const newUrl = hostname + 'images/' + newFileName;
-                if ( /\.(jpe?g|png|gif|bmp)$/i.test(curImageExt) ) {
+                if ( /\.(jpe?g|png|gif|bmp|webp)$/i.test(curImageExt) ) {
                   hasImage.push(newUrl);
                   fs.rename(imagePath, targetPath, err => {
                     if (err) return handleError(err.toString(), res);
@@ -150,6 +157,59 @@ app.post(
           .contentType('application/json')
           .end(JSON.stringify({ err: 'File isn\' a zip' }));
       });
+    }
+  }
+);
+
+app.post(
+  "/api/resize",
+  upload.single("file"),
+  (req, res) => {
+    const result = uploadImage(req, res);
+    if(result.image) {
+      let newResult = {
+        images: [result.image]
+      }
+      gm(result.path).size((err, size) => {
+        if(err)
+          handleError(err.toString(), res);
+        if(size.width > 128 || size.height > 128) {
+          let fileName = path.basename(result.path).toLowerCase();
+          let newFileName = '32_' + fileName;
+          let newUrl = hostname + 'images/' + newFileName;
+          let newPath = path.join(__dirname, 'public','images', newFileName);
+          gm(result.path).resize(32).write(newPath, function (err) {
+            if(err)
+              handleError(err.toString(), res);
+            newResult.images.push(newUrl);
+            fileName = path.basename(result.path).toLowerCase();
+            newFileName = '64_' + fileName;
+            newUrl = hostname + 'images/' + newFileName;
+            newPath = path.join(__dirname, 'public','images', newFileName);
+            gm(result.path).resize(64).write(newPath, function (err) {
+              if(err)
+                handleError(err.toString(), res);
+              newResult.images.push(newUrl);
+              res
+                .status(200)
+                .contentType('application/json')
+                .end(JSON.stringify(newResult));
+
+            });
+          });
+
+
+        } else {
+          res
+            .status(200)
+            .contentType('application/json')
+            .end(JSON.stringify({ images: [result.image] }));
+
+        }
+      })
+
+    } else {
+      handleError(result.err, res);
     }
   }
 );

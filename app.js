@@ -14,7 +14,7 @@ const gm = require("gm");
 
 
 const app = express()
-const hostname = 'http://localhost:3001/';
+const hostname = 'https://assessement.onrender.com/';
 app.mkdir = function(dir) {
   !fs.existsSync(dir) && fs.mkdirSync(dir);
 }
